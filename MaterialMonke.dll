@@ -1,0 +1,79 @@
+using BepInEx;
+using BepInEx.Configuration;
+using Photon.Pun;
+using Photon.Realtime;
+using System;
+using System.IO;
+using UnityEngine;
+
+namespace MaterialMonke
+{
+    [BepInPlugin("org.ernest326.gorillatag.MaterialMonke", "MaterialMonke", "1.0.0")]
+    public class MaterialMonke : BaseUnityPlugin
+    {
+        public static ConfigEntry<bool> enabled;
+
+        public static ConfigEntry<bool> randomColor;
+
+        public static ConfigEntry<float> cycleSpeed;
+
+        public static ConfigEntry<float> glowAmount;
+
+        private Color color = new Color(0f, 0f, 0f);
+
+        private float hue = 0f;
+
+        private float timer = 0f;
+
+        private float updateRate = 0f;
+
+        private float updateTimer = 0f;
+
+        public MaterialMonke()
+        {
+        }
+
+        private void Awake()
+        {
+            Debug.Log("Starting MaterialMonke Monkey");
+            ConfigFile configFile = new ConfigFile(Path.Combine(Paths.get_ConfigPath(), "MaterialMonke.cfg"), true);
+            MaterialMonke.enabled = configFile.Bind<bool>("Config", "Enabled", true, "Whether the plugin is enabled or not");
+            MaterialMonke.randomColor = configFile.Bind<bool>("Config", "RandomColor", false, "Whether to cycle through colours of MaterialMonke or choose random colors");
+            MaterialMonke.cycleSpeed = configFile.Bind<float>("Config", "CycleSpeed", 0.005f, "The speed the color cycles at each frame (1=Full colour cycle). If random colour is enabled, this is the time in seconds before switching color");
+            MaterialMonke.glowAmount = configFile.Bind<float>("Config", "GlowAmount", 1f, "The brightness of your monkey. The higher the value, the more emissive your monkey is");
+        }
+
+        public void Update()
+        {
+            this.updateTimer += Time.get_deltaTime();
+            if ((PhotonNetwork.get_CurrentRoom() == null ? false : !PhotonNetwork.get_CurrentRoom().get_IsVisible()))
+            {
+                if (MaterialMonkeMonke.enabled.get_Value())
+                {
+                    if (!MaterialMonkeMonke.randomColor.get_Value())
+                    {
+                        if (this.hue >= 1f)
+                        {
+                            this.hue = 0f;
+                        }
+                        this.hue += MaterialMonkeMonke.cycleSpeed.get_Value();
+                        this.color = Color.HSVToRGB(this.hue, 1f * MaterialMonkeMonke.glowAmount.get_Value(), 1f * MaterialMonkeMonke.glowAmount.get_Value());
+                    }
+                    else if (Time.get_time() > this.timer)
+                    {
+                        this.color = Random.ColorHSV(0f, 1f, MaterialMonkeMonke.glowAmount.get_Value(), MaterialMonkeMonke.glowAmount.get_Value(), MaterialMonkeMonke.glowAmount.get_Value(), MaterialMonkeMonke.glowAmount.get_Value());
+                        this.timer = Time.get_time() + MaterialMonkeMonke.cycleSpeed.get_Value();
+                    }
+                    if (this.updateTimer > this.updateRate)
+                    {
+                        this.updateTimer = 0f;
+                        GorillaTagger.get_Instance().UpdateColor(this.color.r, this.color.g, this.color.b);
+                        GorillaTagger.get_Instance().myVRRig.get_photonView().RPC("InitializeNoobMaterial", 0, new Object[] { this.color.r, this.color.g, this.color.b });
+                        return;
+                    }
+                    return;
+                }
+            }
+        }
+    }
+}
